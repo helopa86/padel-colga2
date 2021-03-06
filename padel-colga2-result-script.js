@@ -2,21 +2,21 @@
 var ss = SpreadsheetApp.getActiveSpreadsheet();
 var sr = ss.getSheetByName("RANKING"); //Pestaña RANKING
 var playersRankingRows = { //Matriz de resultados jugadores / parejas en la pestaña RANKING
-   "AN" : 89, "GA": 90, "HE": 91, "HU" : 92, "JO" : 93, "LA" : 94,
-   "AN-GA" : 104, "GA-AN":104, "AN-HE" : 105, "HE-AN" : 105, "AN-HU" : 106, "HU-AN" : 106,
-   "AN-JO" : 107, "JO-AN":107, "AN-LA" : 108, "LA-AN" : 108, "GA-HE" : 109, "HE-GA" : 109,
-   "GA-HU" : 110, "HU-GA":110, "GA-JO" : 111, "JO-GA" : 111, "GA-LA" : 112, "LA-GA" : 112,
-   "HE-HU" : 113, "HU-HE":113, "HE-JO" : 114, "JO-HE" : 114, "HE-LA" : 115, "LA-HE" : 115,
-   "HU-JO" : 116, "JO-HU":116, "HU-LA" : 117, "LA-HU" : 117, "JO-LA" : 118, "LA-JO" : 118 
+  "AN" : 89, "GA": 90, "HE": 91, "HU" : 92, "JO" : 93, "LA" : 94,
+  "AN-GA" : 104, "GA-AN":104, "AN-HE" : 105, "HE-AN" : 105, "AN-HU" : 106, "HU-AN" : 106,
+  "AN-JO" : 107, "JO-AN":107, "AN-LA" : 108, "LA-AN" : 108, "GA-HE" : 109, "HE-GA" : 109,
+  "GA-HU" : 110, "HU-GA":110, "GA-JO" : 111, "JO-GA" : 111, "GA-LA" : 112, "LA-GA" : 112,
+  "HE-HU" : 113, "HU-HE":113, "HE-JO" : 114, "JO-HE" : 114, "HE-LA" : 115, "LA-HE" : 115,
+  "HU-JO" : 116, "JO-HU":116, "HU-LA" : 117, "LA-HU" : 117, "JO-LA" : 118, "LA-JO" : 118
 }
 
 var playersRankingGraphics = { //Matriz rankings
-   "AN" : 1, "GA": 2, "HE": 3, "HU" : 4, "JO" : 5, "LA" : 6,
-   "AN-GA" : 8, "GA-AN":8, "AN-HE" : 9, "HE-AN" : 9, "AN-HU" : 10, "HU-AN" : 10,
-   "AN-JO" : 11, "JO-AN":11, "AN-LA" : 12, "LA-AN" : 12, "GA-HE" : 13, "HE-GA" : 13,
-   "GA-HU" : 14, "HU-GA":14, "GA-JO" : 15, "JO-GA" : 15, "GA-LA" : 16, "LA-GA" : 16,
-   "HE-HU" : 17, "HU-HE":17, "HE-JO" : 18, "JO-HE" : 18, "HE-LA" : 19, "LA-HE" : 19,
-   "HU-JO" : 20, "JO-HU":20, "HU-LA" : 21, "LA-HU" : 21, "JO-LA" : 22, "LA-JO" : 22 
+  "AN" : 1, "GA": 2, "HE": 3, "HU" : 4, "JO" : 5, "LA" : 6,
+  "AN-GA" : 8, "GA-AN":8, "AN-HE" : 9, "HE-AN" : 9, "AN-HU" : 10, "HU-AN" : 10,
+  "AN-JO" : 11, "JO-AN":11, "AN-LA" : 12, "LA-AN" : 12, "GA-HE" : 13, "HE-GA" : 13,
+  "GA-HU" : 14, "HU-GA":14, "GA-JO" : 15, "JO-GA" : 15, "GA-LA" : 16, "LA-GA" : 16,
+  "HE-HU" : 17, "HU-HE":17, "HE-JO" : 18, "JO-HE" : 18, "HE-LA" : 19, "LA-HE" : 19,
+  "HU-JO" : 20, "JO-HU":20, "HU-LA" : 21, "LA-HU" : 21, "JO-LA" : 22, "LA-JO" : 22
 }
 
 var rangeGraphics = sr.getRange("C122:Y622").getValues(); //Ranking máximo de 500 partidos
@@ -37,17 +37,70 @@ var resultStyleOK = "#b5d7a8"; //color verde
 var resultStyleKO = "#f4cccc"; //color rojo
 
 
+var alignmentsRange = "Z2"; //Constantes para cargar los jugadores
+
+
+
 function onOpen() {
   var ui = SpreadsheetApp.getUi();
   ui.createMenu('Padel')
+      .addItem('Cargar Jugadores', "loadPlayers")
+      .addSeparator()
       .addItem('Guardar Resultados', 'saveResults')
       .addToUi();
 }
 
 /**
+ * Función para cargar los jugadores en las tablas "partido" del excel, desde una celda con el siguiente formato en texto plano:
+ * [local1-local2#visitante1-visitante2, local1-local2#visitante1-visitante2 ....]
+ */
+function loadPlayers(){
+  var players = ss.getRange(alignmentsRange).getValue(); //Obtiene las alineaciones desde Z2
+  if(players === ""){ //comprueba que existan jugadores
+    showAlert("No hay jugadores para cargar");
+    return;
+  }
+
+  var matches = players.substring(1, players.length-1).split(","); //realiza un split de cada uno de los partidos
+  var limit = rowStart + 15*rowIncrement;  //15 filas, 45 partidos, 6 jugadores
+  var matchIndex = 0; //indice para seleccionar los partidos
+
+  for(var i=rowStart; i < limit;i=i+rowIncrement){ //filas de partidos
+    for(var j=0;j<6;j=j+2){ //columna
+      var matchRange = ss.getRange(columnsResult[j]+i+":"+columnsResult[j+1]+(i+1));
+      var matchRangeValues = matchRange.getValues(); //Rango de celdas de un partido
+      if(matchRangeValues[0][0] === ""){ //cuando ya no haya mas "cajas" de partido termina el bucle
+        i = limit;
+        break;
+      }
+      var matchWithPlayersValues = loadMatch(matchRangeValues, matches[matchIndex]); //carga los valores con los nombres de los jugadores del partido
+      matchRange.setValues(matchWithPlayersValues); //Pone los valores en el excel, en su correspondiente partido
+
+      matchIndex = matchIndex + 1;
+    }
+  }
+
+  ss.getRange(alignmentsRange).setValue(""); //elimina los valores de los jugadores en "plano"
+  showAlert("Jugadores Cargados!");
+}
+
+function loadMatch(matchRange,match){
+  match = match.trim(); //elimina espacios por delante y por detrás del partido
+  var pairs = match.split("#"); //separa la información en pareja local/pareja visitante
+  var playersLocal = pairs[0].split("-"); //separa la pareja local en jugador local 1 y jugador local 2
+  var playersVisitor = pairs[1].split("-"); //separa la pareja visitante en jugador visitante 1 y jugador visitante 2
+  matchRange[0][1] = playersLocal[0]; //Pone los valores en la matriz
+  matchRange[1][1] = playersLocal[1];
+  matchRange[0][4] = playersVisitor[0];
+  matchRange[1][4] = playersVisitor[1];
+  return matchRange;
+}
+
+
+/**
  * Itera sobre cada tabla partido del excel.
  * Filas de máximo hasta 45 partidos (15 filas)
- * Columnas de tres partidos por fila 
+ * Columnas de tres partidos por fila
  */
 function saveResults() {
   if(ss.getRange("A1").getValue()==="*"){
@@ -69,7 +122,7 @@ function saveResults() {
   sr.getRange("C122:Y622").setValues(rangeGraphics); //actualizamos los resultados
   ss.getRange("A1").setValue("*");
   showAlert("Resultados Añadidos!");
-  
+
 }
 /**
  * matchRange: son los valores de la tabla que contiene un partido (nombres de jugadores y resultados)
@@ -110,7 +163,7 @@ function writeMatch(matchRange, row, columnLocal, columnVisit){
       rankingResultPair = writePairRanking(localPairArray[2], visitPairArray[2]); //añadir ranking a las parejas siendo ganador el equipo local
       rankingResultIndividuals = writeInvidualRanking(localPairArray[0],localPairArray[1], visitPairArray[0], visitPairArray[1]); //añadir ranking a los individuos
       writeChartRankings(localPairArray,visitPairArray,rankingResultIndividuals,rankingResultPair, true);
-      ss.getRange(columnLocal+row).setBackground(resultStyleOK); //Pone un color verde al resultado del equipo local 
+      ss.getRange(columnLocal+row).setBackground(resultStyleOK); //Pone un color verde al resultado del equipo local
       ss.getRange(columnVisit+row).setBackground(resultStyleKO); //Pone un color rojo al resultado del equipo visitante
     }else{ //si ha ganado la pareja visitante
       addResult(localPairArray[0], matchLostRankingColumn, 1); //añade partido perdido al jugador local 1
@@ -122,7 +175,7 @@ function writeMatch(matchRange, row, columnLocal, columnVisit){
       rankingResultPair = writePairRanking(visitPairArray[2], localPairArray[2]); //añadir ranking a las parejas siendo ganador el equipo visitante
       rankingResultIndividuals = writeInvidualRanking(visitPairArray[0],visitPairArray[1], localPairArray[0], localPairArray[1]); //añadir ranking a los individuos
       writeChartRankings(localPairArray,visitPairArray,rankingResultIndividuals,rankingResultPair, false);
-      ss.getRange(columnLocal+row).setBackground(resultStyleKO); //Pone un color rojo al resultado del equipo local 
+      ss.getRange(columnLocal+row).setBackground(resultStyleKO); //Pone un color rojo al resultado del equipo local
       ss.getRange(columnVisit+row).setBackground(resultStyleOK); //Pone un color verde al resultado del equipo visitante
     }
 
@@ -140,7 +193,7 @@ function addResult(player, resultColumn, resultValue){
   sr.getRange(resultColumn+playersRankingRows[player]).setValue(updatedResult);
 }
 
-/** convertToPlayersPair 
+/** convertToPlayersPair
  * Convierte nombres completos a prefijos, por ejemplo
  * Huertas-Garcho a HU-GA
  * devuelve -
@@ -205,11 +258,11 @@ function writeChartRankings(localPairArray, visitPairArray, rankingResultIndivid
       rangeGraphics[i][0]=i+1; //Nº de partido
       for(var j=1;j<rangeGraphics[i].length;j=j+1){
         if(i===0){
-           rangeGraphics[i][j]=0; //Si estamos al principio de la tabla de resultados ponemos un 0
+          rangeGraphics[i][j]=0; //Si estamos al principio de la tabla de resultados ponemos un 0
         }else{
-           rangeGraphics[i][j] = rangeGraphics[i-1][j]; //Si ya hay unos resultados contabilizados se copian los anteriores 
+          rangeGraphics[i][j] = rangeGraphics[i-1][j]; //Si ya hay unos resultados contabilizados se copian los anteriores
         }
-        
+
       }
       break;
     }
@@ -221,7 +274,7 @@ function writeChartRankings(localPairArray, visitPairArray, rankingResultIndivid
     rangeGraphics[i][playersRankingGraphics[visitPairArray[1]]]=rankingResultIndividuals[3]; //Actualizamos la tabla con el valor del ranking del jugador visitante 2 perdedor
     rangeGraphics[i][playersRankingGraphics[localPairArray[2]]]=rankingResultPair[0]; //Actualizamos la tabla con el valor de ranking de la pareja local ganadora
     rangeGraphics[i][playersRankingGraphics[visitPairArray[2]]]=rankingResultPair[1]; //Actualizamos la tabla con el valor de ranking de la pareja visitante perdedora
-  
+
   }else{
     rangeGraphics[i][playersRankingGraphics[localPairArray[0]]]=rankingResultIndividuals[2]; //Actualizamos la tabla con el valor del ranking del jugador local 1 perdedor
     rangeGraphics[i][playersRankingGraphics[localPairArray[1]]]=rankingResultIndividuals[3]; //Actualizamos la tabla con el valor del ranking del jugador local 2 perdedor
@@ -255,7 +308,6 @@ function formuleRanking(rankingWinner, rankingLooser){
 function showAlert(msg){
   SpreadsheetApp.getUi().alert(msg);
 }
-
 
 
 
